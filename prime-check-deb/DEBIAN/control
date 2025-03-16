@@ -1,0 +1,8 @@
+Package: prime-check
+Version: 1.0
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libc6
+Maintainer: Nessy <davanddan2428@gmail.com>
+Description: Программа для проверки числа на простоту.

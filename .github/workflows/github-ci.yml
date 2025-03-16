@@ -1,0 +1,41 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Клонирование репозитория
+      uses: actions/checkout@v3
+
+    - name: Установка зависимостей
+      run: sudo apt update && sudo apt install -y build-essential
+
+    - name: Сборка
+      run: ./build.sh
+
+    - name: Тестирование
+      run: ./test.sh
+
+    - name: Упаковка в deb
+      run: ./package.sh
+
+    - name: Загрузка артефактов (deb-пакет)
+      uses: actions/upload-artifact@v3
+      with:
+        name: prime-check-deb
+        path: prime-check_1.0_amd64.deb
+
+    - name: Создание релиза
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: prime-check_1.0_amd64.deb

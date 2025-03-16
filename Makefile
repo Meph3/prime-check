@@ -1,6 +1,10 @@
 CXX=g++
 CXXFLAGS=-Wall -Wextra
+<<<<<<< HEAD
 TARGET=prime_checker
+=======
+TARGET=prime-check
+>>>>>>> 565229c (lab2)
 
 all: $(TARGET)
 
