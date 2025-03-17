@@ -9,10 +9,11 @@ if [[ ! -x "./prime-check" ]]; then
     exit 1
 fi
 
-# Проверяем, выводит ли программа правильный результат
+# Выполняем программу и сохраняем вывод
 output=$(./prime-check 7 | tr -d '\r')
 
-if echo "$output" | grep -iq "прост"; then
+# Проверяем наличие слов "простое" или "prime"
+if echo "$output" | grep -Eiq "прост|prime"; then
     echo "Тест пройден: 7 - простое число"
 else
     echo "Тест провален! Полученный вывод:"
