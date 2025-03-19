@@ -30,13 +30,14 @@ jobs:
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-
+      - name: Установка динамического тега
+        run: echo "TAG_NAME=v1.0.$(date +%s)" >> $GITHUB_ENV
 
       - name: Сборка Docker-образа
-        run: docker build -t meph3/prime-check:v1.0 .
+        run: docker build -t meph3/prime-check:${{ env.TAG_NAME }} .
 
       - name: Публикация Docker-образа
-        run: docker push meph3/prime-check:v1.0
+        run: docker push meph3/prime-check:${{ env.TAG_NAME }}
 
   release:
     needs: build
@@ -54,9 +55,7 @@ jobs:
       - name: Проверка наличия тега
         id: check_tag
         run: |
-          TAG_NAME="v1.0"
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Тег уже существует"
+          if git rev-parse "v1.0" >/dev/null 2>&1; then
             echo "tag_exists=true" >> $GITHUB_ENV
           else
             echo "tag_exists=false" >> $GITHUB_ENV
@@ -65,14 +64,13 @@ jobs:
       - name: Создание тега (если его нет)
         if: env.tag_exists == 'false'
         run: |
-          TAG_NAME="v1.0"
-          git tag -a "$TAG_NAME" -m "Автоматический релиз $TAG_NAME"
-          git push origin "$TAG_NAME"
+          git tag -a "${{ env.TAG_NAME }}" -m "Автоматический релиз ${{ env.TAG_NAME }}"
+          git push origin "${{ env.TAG_NAME }}"
 
       - name: Создание релиза
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v1.0
-          name: "Релиз v1.0"
+          tag_name: ${{ env.TAG_NAME }}
+          name: "Релиз ${{ env.TAG_NAME }}"
           draft: false
           prerelease: false
