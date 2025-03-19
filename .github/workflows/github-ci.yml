@@ -42,17 +42,19 @@ jobs:
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions"
 
-    - name: Проверка прав `GITHUB_TOKEN`
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | sed 's/./& /g'
-
-    - name: Создание тега (если его нет)
+    - name: Удаление старого тега (если он существует)
       run: |
         TAG_NAME="v1.0"
-        if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-          echo "Тег $TAG_NAME уже существует. Перезаписываем..."
-          git tag -d "$TAG_NAME"
-          git push --delete origin "$TAG_NAME"
+        if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+          echo "Старый тег $TAG_NAME найден. Удаляем..."
+          git push origin --delete "$TAG_NAME"
+        else
+          echo "Тег $TAG_NAME не найден. Создаем новый."
         fi
+
+    - name: Создание нового тега
+      run: |
+        TAG_NAME="v1.0"
         git tag -a "$TAG_NAME" -m "Автоматический релиз $TAG_NAME"
         git push origin "$TAG_NAME"
 
