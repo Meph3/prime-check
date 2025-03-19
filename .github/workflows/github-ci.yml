@@ -13,9 +13,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    outputs:
-      TAG_NAME: ${{ steps.tagging.outputs.TAG_NAME }}
-
     steps:
       - name: Клонирование репозитория
         uses: actions/checkout@v3
@@ -30,23 +27,7 @@ jobs:
             exit 1
           fi
 
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-      - name: Генерация тега версии
-        id: tagging
-        run: |
-          TAG_NAME="v1.0.$(date +%s)"
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          echo "::set-output name=TAG_NAME::$TAG_NAME"
-
-      - name: Сборка Docker-образа
-        run: docker build -t meph3/prime-check:${{ env.TAG_NAME }} .
-
-      - name: Публикация Docker-образа
-        run: docker push meph3/prime-check:${{ env.TAG_NAME }}
-
-  release:
+  test:
     needs: build
     runs-on: ubuntu-latest
 
@@ -54,33 +35,41 @@ jobs:
       - name: Клонирование репозитория
         uses: actions/checkout@v3
 
-      - name: Настройка Git перед созданием тега
+      - name: Запуск тестов
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
+          echo "Запуск тестов..."
+          # Здесь добавьте команды для тестирования, например:
+          # ./gradlew test или mvn test
+          echo "Тесты пройдены успешно."
 
-      - name: Получение тега из build
-        run: echo "TAG_NAME=${{ needs.build.outputs.TAG_NAME }}" >> $GITHUB_ENV
+  package:
+    needs: test
+    runs-on: ubuntu-latest
 
-      - name: Проверка наличия тега
-        id: check_tag
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Сборка Docker-образа
+        run: docker build -t meph3/prime-check:v1.0 .
+
+  deploy:
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v3
+
+      - name: Публикация Docker-образа
+        run: docker push meph3/prime-check:v1.0
+
+      - name: Деплой на сервер
         run: |
-          if git rev-parse "${{ env.TAG_NAME }}" >/dev/null 2>&1; then
-            echo "tag_exists=true" >> $GITHUB_ENV
-          else
-            echo "tag_exists=false" >> $GITHUB_ENV
-          fi
-
-      - name: Создание тега (если его нет)
-        if: env.tag_exists == 'false'
-        run: |
-          git tag -a "${{ env.TAG_NAME }}" -m "Автоматический релиз ${{ env.TAG_NAME }}"
-          git push origin "${{ env.TAG_NAME }}"
-
-      - name: Создание релиза
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: "Релиз ${{ env.TAG_NAME }}"
-          draft: false
-          prerelease: false
+          echo "Развёртывание на сервере..."
+          # Здесь добавьте команды для деплоя, например:
+          # ssh user@server "docker pull meph3/prime-check:v1.0 && docker run -d meph3/prime-check:v1.0"
+          echo "Деплой завершён."
