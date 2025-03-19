@@ -7,70 +7,70 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  build-test-package:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Клонирование репозитория
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0  
+      - name: Клонирование репозитория
+        uses: actions/checkout@v3
 
-    - name: Установка зависимостей
-      run: sudo apt update && sudo apt install -y build-essential
+      - name: Установка зависимостей
+        run: sudo apt-get update && sudo apt-get install -y curl jq
 
-    - name: Разрешение на выполнение скриптов
-      run: chmod +x build.sh test.sh package.sh
+      - name: Проверка наличия Dockerfile
+        run: |
+          if [ ! -f Dockerfile ]; then
+            echo "Ошибка: Dockerfile отсутствует!"
+            exit 1
+          fi
 
-    - name: Сборка
-      run: ./build.sh
+      - name: Логин в Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-    - name: Тестирование
-      run: ./test.sh
+      - name: Сборка Docker-образа
+        run: docker build -t meph3/prime-check:v1.0 .
 
-    - name: Упаковка в deb
-      run: ./package.sh
+      - name: Публикация Docker-образа
+        run: docker push meph3/prime-check:v1.0
 
-    - name: Загрузка артефактов (deb-пакет)
-      uses: actions/upload-artifact@v4
-      with:
-        name: prime-check-deb
-        path: prime-check_1.0_amd64.deb
+  release:
+    needs: build
+    runs-on: ubuntu-latest
 
-    - name: Настройка Git перед созданием тега
-      run: |
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions"
+    steps:
+      - name: Клонирование репозитория
+        uses: actions/checkout@v3
 
-    - name: Удаление старого тега (если он существует)
-      run: |
-        TAG_NAME="v1.0"
-        if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
-          echo "Старый тег $TAG_NAME найден. Удаляем..."
-          git push origin --delete "$TAG_NAME"
-          git tag -d "$TAG_NAME"
-        fi
+      - name: Настройка Git перед созданием тега
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
 
-    - name: Создание нового тега
-      run: |
-        TAG_NAME="v1.0"
-        git tag -a "$TAG_NAME" -m "Автоматический релиз $TAG_NAME"
-        git push origin "$TAG_NAME"
+      - name: Проверка наличия тега
+        id: check_tag
+        run: |
+          TAG_NAME="v1.0"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Тег уже существует"
+            echo "tag_exists=true" >> $GITHUB_ENV
+          else
+            echo "tag_exists=false" >> $GITHUB_ENV
+          fi
 
-    - name: Проверка наличия тега перед релизом
-      run: |
-        TAG_NAME="v1.0"
-        if ! git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
-          echo "Ошибка: Тег $TAG_NAME не найден после создания!"
-          exit 1
-        fi
+      - name: Создание тега (если его нет)
+        if: env.tag_exists == 'false'
+        run: |
+          TAG_NAME="v1.0"
+          git tag -a "$TAG_NAME" -m "Автоматический релиз $TAG_NAME"
+          git push origin "$TAG_NAME"
 
-    - name: Создание релиза
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: "v1.0"  
-        files: prime-check_1.0_amd64.deb
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Создание релиза
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0
+          name: "Релиз v1.0"
+          draft: false
+          prerelease: false
