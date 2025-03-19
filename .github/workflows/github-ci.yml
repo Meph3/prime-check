@@ -15,6 +15,8 @@ jobs:
     steps:
     - name: Клонирование репозитория
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  
 
     - name: Установка зависимостей
       run: sudo apt update && sudo apt install -y build-essential
@@ -48,8 +50,7 @@ jobs:
         if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
           echo "Старый тег $TAG_NAME найден. Удаляем..."
           git push origin --delete "$TAG_NAME"
-        else
-          echo "Тег $TAG_NAME не найден. Создаем новый."
+          git tag -d "$TAG_NAME"
         fi
 
     - name: Создание нового тега
@@ -58,9 +59,18 @@ jobs:
         git tag -a "$TAG_NAME" -m "Автоматический релиз $TAG_NAME"
         git push origin "$TAG_NAME"
 
+    - name: Проверка наличия тега перед релизом
+      run: |
+        TAG_NAME="v1.0"
+        if ! git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+          echo "Ошибка: Тег $TAG_NAME не найден после создания!"
+          exit 1
+        fi
+
     - name: Создание релиза
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: "v1.0"  
         files: prime-check_1.0_amd64.deb
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
