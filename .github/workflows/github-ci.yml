@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Установка зависимостей
-        run: sudo apt-get update && sudo apt-get install -y curl jq
+        run: sudo apt-get update && sudo apt-get install -y curl jq dpkg-dev
 
       - name: Проверка наличия Dockerfile
         run: |
@@ -36,11 +36,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Запуск тестов
-        run: |
-          echo "Запуск тестов..."
-          # Здесь добавьте команды для тестирования, например:
-          # ./gradlew test или mvn test
-          echo "Тесты пройдены успешно."
+        run: chmod +x test.sh && ./test.sh
 
   package:
     needs: test
@@ -50,11 +46,19 @@ jobs:
       - name: Клонирование репозитория
         uses: actions/checkout@v3
 
+      - name: Упаковка в deb-пакет
+        run: chmod +x package.sh && ./package.sh
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Сборка Docker-образа
-        run: docker build -t meph3/prime-check:v1.0 .
+        run: |
+          docker build -t meph3/prime-check:v1.0 .
+          docker tag meph3/prime-check:v1.0 meph3/prime-check:latest
+
+      - name: Проверка наличия Docker-образа
+        run: docker images | grep "meph3/prime-check"
 
   deploy:
     needs: package
@@ -65,11 +69,22 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Публикация Docker-образа
-        run: docker push meph3/prime-check:v1.0
+        run: |
+          docker push meph3/prime-check:v1.0
+          docker push meph3/prime-check:latest
 
       - name: Деплой на сервер
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
-          echo "Развёртывание на сервере..."
-          # Здесь добавьте команды для деплоя, например:
-          # ssh user@server "docker pull meph3/prime-check:v1.0 && docker run -d meph3/prime-check:v1.0"
-          echo "Деплой завершён."
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
+            docker pull meph3/prime-check:v1.0
+            docker stop prime-check || true
+            docker rm prime-check || true
+            docker run -d --name prime-check meph3/prime-check:v1.0
+          EOF
