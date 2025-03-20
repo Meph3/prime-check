@@ -30,12 +30,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prime-check-binary
-          path: ./prime-check  # Указываем путь к бинарному файлу
+          path: ./prime-check  # Путь к собранному бинарному файлу
 
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: build
+    needs: build  # Запускается только после успешного `build`
 
     steps:
       - name: Checkout repository
@@ -45,6 +45,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: prime-check-binary
+          path: ./  # Загружаем бинарный файл в текущую директорию
 
       - name: List files (debug)
         run: ls -la
@@ -58,7 +59,7 @@ jobs:
   package:
     name: Package
     runs-on: ubuntu-latest
-    needs: test
+    needs: test  # Запускается только после успешного `test`
 
     steps:
       - name: Checkout repository
@@ -77,12 +78,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prime-check-deb-package
-          path: prime-check-deb/usr/local/bin/prime-check  # Убедись, что файл существует!
+          path: prime-check-deb/usr/local/bin/prime-check  # Проверяем, что файл существует!
 
-  docker:
-    name: Build Docker Image
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
-    needs: package
+    needs: package  # Запускается только после успешного `package`
 
     steps:
       - name: Checkout repository
@@ -92,7 +93,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: prime-check-deb-package
-          path: ./  # Указываем путь к текущей директории
+          path: ./  # Загружаем в текущую директорию
 
       - name: Install Docker
         run: |
