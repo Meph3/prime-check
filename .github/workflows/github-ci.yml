@@ -8,7 +8,6 @@ on:
     branches:
       - main
 
-
 jobs:
   build:
     name: Build
@@ -22,7 +21,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
       - name: Build project
-        run: make all
+        run: ./build.sh
 
       - name: List files (debug)
         run: ls -la
@@ -50,10 +49,11 @@ jobs:
       - name: List files (debug)
         run: ls -la
 
+      - name: Make binary executable
+        run: chmod +x prime-check
+
       - name: Run tests
-        run: |
-          chmod +x test.sh
-          ./test.sh
+        run: ./test.sh
 
   package:
     name: Package
@@ -70,14 +70,14 @@ jobs:
       - name: Build .deb package
         run: ./package.sh
 
-      - name: List files (debug)
-        run: ls -la prime-check-deb/
+      - name: List package contents
+        run: ls -la prime-check-deb/usr/local/bin/
 
       - name: Upload .deb package
         uses: actions/upload-artifact@v4
         with:
           name: prime-check-deb-package
-          path: prime-check-deb/usr/local/bin/prime-check
+          path: prime-check-deb/usr/local/bin/prime-check  # Убедись, что файл существует!
 
   docker:
     name: Build Docker Image
@@ -92,13 +92,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: prime-check-deb-package
-          path: .
+          path: ./  # Указываем путь к текущей директории
 
       - name: Install Docker
         run: |
           curl -fsSL https://get.docker.com | sudo bash
           sudo systemctl start docker
           sudo systemctl enable docker
+
+      - name: Verify downloaded package
+        run: ls -la ./prime-check  # Проверяем, загружен ли файл
 
       - name: Build Docker image
         run: docker build -t prime-check .
