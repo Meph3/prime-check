@@ -1,30 +1,16 @@
-# Используем официальный образ Ubuntu
-FROM ubuntu:latest
+FROM ubuntu:22.04  
 
-# Ускоряем установку и обновляем пакеты
-RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup \
-    && apt-get -o Acquire::Check-Valid-Until=false update \
-    && apt-get install -y build-essential \
-    && rm -rf /var/lib/apt/lists/*  # Очищаем кеш apt
+# Устанавливаем необходимые зависимости
+RUN apt-get update && apt-get install -y dpkg  
 
-# Устанавливаем зависимости
-RUN apt update && apt install -y build-essential
+# Копируем deb-пакет
+COPY prime-check-deb.deb /tmp/prime-check.deb  
 
-# Копируем исходный код
-WORKDIR /app
-COPY . /app
+# Устанавливаем deb-пакет
+RUN dpkg -i /tmp/prime-check.deb || apt-get install -f -y  
 
-# Даем разрешение на выполнение скриптов
-RUN chmod +x build.sh test.sh package.sh || true
+# Делаем бинарный файл исполнимым
+RUN chmod +x /usr/local/bin/prime-check  
 
-# Собираем проект
-RUN ./build.sh
-
-# Запускаем тесты
-RUN ./test.sh
-
-# Создаем deb-пакет
-RUN ./package.sh
-
-# Определяем точку входа (основной исполняемый файл)
-CMD ["./prime-check"]
+# Запуск программы
+CMD ["/usr/local/bin/prime-check"]
