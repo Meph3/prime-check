@@ -1,4 +1,4 @@
-name: CI/CD Prime-Check
+name: CI/CD Prime Check
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+
 
 jobs:
   build:
@@ -24,18 +25,18 @@ jobs:
         run: ./build.sh
 
       - name: List files (debug)
-        run: ls -la
+        run: ls -la prime-check-deb/usr/local/bin/
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: prime-check-binary
-          path: ./prime-check  # Путь к собранному бинарному файлу
+          name: prime-binary
+          path: prime-check-deb/usr/local/bin/prime-check  # Проверенный путь
 
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: build  # Запускается только после успешного `build`
+    needs: build  # Ждёт завершения build
 
     steps:
       - name: Checkout repository
@@ -44,8 +45,8 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: prime-check-binary
-          path: ./  # Загружаем бинарный файл в текущую директорию
+          name: prime-binary
+          path: ./  # Скачиваем бинарник в корень
 
       - name: List files (debug)
         run: ls -la
@@ -59,31 +60,31 @@ jobs:
   package:
     name: Package
     runs-on: ubuntu-latest
-    needs: test  # Запускается только после успешного `test`
+    needs: test  # Ждёт завершения тестов
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install packaging dependencies
+      - name: Install dependencies for packaging
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev
 
-      - name: Build .deb package
+      - name: Package .deb file
         run: ./package.sh
 
-      - name: List package contents
-        run: ls -la prime-check-deb/usr/local/bin/
+      - name: List files (debug)
+        run: ls -la prime-check-deb
 
       - name: Upload .deb package
         uses: actions/upload-artifact@v4
         with:
-          name: prime-check-deb-package
-          path: prime-check-deb/usr/local/bin/prime-check  # Проверяем, что файл существует!
+          name: prime-check-deb
+          path: prime-check-deb  # Сохраняем deb-пакет
 
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: package  # Запускается только после успешного `package`
+    needs: package  # Ждёт завершения packaging
 
     steps:
       - name: Checkout repository
@@ -92,32 +93,20 @@ jobs:
       - name: Download .deb package
         uses: actions/download-artifact@v4
         with:
-          name: prime-check-deb-package
-          path: ./  # Загружаем в текущую директорию
+          name: prime-check-deb
+          path: build/
 
-      - name: Install Docker
-        run: |
-          curl -fsSL https://get.docker.com | sudo bash
-          sudo systemctl start docker
-          sudo systemctl enable docker
+      - name: List files (debug)
+        run: ls -la build/
 
-      - name: Verify downloaded package
-        run: ls -la ./prime-check  # Проверяем, загружен ли файл
-
-      - name: Build Docker image
+      - name: Build Docker Image
         run: docker build -t prime-check .
 
-      - name: List Docker images
-        run: docker images
-
-      - name: Save Docker image
-        run: docker save -o /tmp/prime-check.tar prime-check
-
-      - name: Debug: List /tmp/ directory
-        run: ls -la /tmp/
-
-      - name: Upload Docker image
+      - name: Save Docker image as artifact
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: /tmp/prime-check.tar
+
+      - name: Run Docker container
+        run: docker run --rm prime-check
