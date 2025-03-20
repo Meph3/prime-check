@@ -18,16 +18,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential dpkg-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential
 
       - name: Build project
-        run: bash build.sh
+        run: make all
+
+      - name: List files (debug)
+        run: ls -la
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: prime-check-binary
-          path: prime-check-deb/usr/local/bin/prime-check
+          path: ./prime-check  # Путь к бинарному файлу
 
   test:
     name: Test
@@ -43,8 +46,13 @@ jobs:
         with:
           name: prime-check-binary
 
+      - name: List files (debug)
+        run: ls -la
+
       - name: Run tests
-        run: bash test.sh
+        run: |
+          chmod +x test.sh
+          ./test.sh
 
   package:
     name: Package
@@ -55,14 +63,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Package into .deb
-        run: bash package.sh
+      - name: Install dependencies for packaging
+        run: sudo apt-get update && sudo apt-get install -y build-essential dpkg-dev
+
+      - name: Build .deb package
+        run: ./package.sh
+
+      - name: List files (debug)
+        run: ls -la
 
       - name: Upload .deb package
         uses: actions/upload-artifact@v4
         with:
           name: prime-check-deb-package
-          path: prime-check-deb.deb
+          path: ./prime-check-deb/*.deb  # Путь к пакету
 
   deploy:
     name: Deploy
@@ -79,19 +93,21 @@ jobs:
           name: prime-check-deb-package
           path: build
 
-      - name: Install Docker
-        run: |
-          curl -fsSL https://get.docker.com | sudo bash
-          sudo systemctl start docker
-          sudo systemctl enable docker
+      - name: List files (debug)
+        run: ls -la build
 
-      - name: Build and push Docker image
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-          docker build -t meph3/prime-check:v1.0 .
-          docker tag meph3/prime-check:v1.0 meph3/prime-check:latest
-          docker push meph3/prime-check:v1.0
-          docker push meph3/prime-check:latest
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false  # Отключаем автоматический пуш в Docker Hub
+          tags: meph3/prime-check:latest
+
+      - name: Save Docker Image
+        run: docker save -o prime-check.tar meph3/prime-check:latest
+
+      - name: Upload Docker Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: prime-check-docker-image
+          path: prime-check.tar
