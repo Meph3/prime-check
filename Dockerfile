@@ -1,4 +1,8 @@
-FROM ubuntu:22.04  
+FROM ubuntu:latest
+ 
+
+RUN apt-get install -y libstdc++6
+
 
 RUN apt-get update && apt-get install -y dpkg  
 
